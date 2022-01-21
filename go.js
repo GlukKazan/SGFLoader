@@ -114,14 +114,77 @@ function analyze(board, SIZE) {
     }
 }
 
-function GetFen(board, SIZE, inverse) {
+function flipX(pos, SIZE) {
+    const x = pos % SIZE;
+    pos -= x;
+    return pos + (SIZE - x - 1);
+}
+
+function flipY(pos, SIZE) {
+    const y = (pos / SIZE) | 0;
+    pos -= y * SIZE;
+    return (SIZE - y - 1) * SIZE + pos;
+}
+
+function toRight(pos, SIZE) {
+    const x = pos % SIZE;
+    const y = (pos / SIZE) | 0;
+    return x * SIZE + (SIZE - y - 1);
+}
+
+function toLeft(pos, SIZE) {
+    const x = pos % SIZE;
+    const y = (pos / SIZE) | 0;
+    return (SIZE - x - 1) * SIZE + y;
+}
+
+function transform(pos, n, SIZE) {    
+    switch (n) {
+        case 1:
+            pos = flipX(pos, SIZE);
+            break;
+        case 2:
+            pos = flipY(pos, SIZE);
+            break;
+        case 3:
+            pos = flipX(pos, SIZE);
+            pos = flipY(pos, SIZE);
+            break;
+        case 4:
+            pos = toRight(pos, SIZE);
+            break;
+        case 5:
+            pos = toLeft(pos, SIZE);
+            break;
+        case 6:
+            pos = toRight(pos, SIZE);
+            pos = flipX(pos, SIZE);
+            break;
+        case 7:
+            pos = toLeft(pos, SIZE);
+            pos = flipX(pos, SIZE);
+            break;
+        case 8:
+            pos = flipX(pos, SIZE);
+            pos = toLeft(pos, SIZE);
+            break;
+        case 9:
+            pos = flipX(pos, SIZE);
+            pos = toRight(pos, SIZE);
+            break;
+    }
+    return pos;
+}
+
+function GetFen(board, SIZE, inverse, rotate) {
     let r = "";
 
     for (let row = 0; row < SIZE; row++) {
         if (row != 0) r += '/';
         let empty = 0;
         for (let col = 0; col < SIZE; col++) {
-            let piece = board[row * SIZE + col];
+            const pos = transform(row * SIZE + col, rotate, SIZE);
+            const piece = board[pos];
             if (isEmpty(piece)) {
                 if (empty > 8) {
                     r += empty;
@@ -171,3 +234,4 @@ function navigate(pos, dir, SIZE) {
 
 module.exports.GetFen = GetFen;
 module.exports.RedoMove = RedoMove;
+module.exports.transform = transform;
