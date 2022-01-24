@@ -1,12 +1,12 @@
 "use strict";
 
-const tf = require('@tensorflow/tfjs');
+const tf = require('@tensorflow/tfjs-node');
 const {nodeFileSystemRouter} = require('@tensorflow/tfjs-node/dist/io/file_system');
 
 const URL = 'https://games.dtco.ru/model/model.json';
 
 const BATCH_SIZE  = 128;
-const EPOCH_COUNT = 5;
+const EPOCH_COUNT = 7;
 const VALID_SPLIT = 0.1;
 const FREEZE_CNT  = 0;
 
@@ -115,7 +115,9 @@ async function fit(batch, size) {
 }
 
 async function save(savePath) {
-    await model.save(`file:///tmp/${savePath}`);
+    isReady = false;
+    await model.save(`file:///users/valen/${savePath}`);
+    isReady = true;
 }
 
 module.exports.init    = init;

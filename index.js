@@ -10,10 +10,11 @@ const _ = require('underscore');
 
 const abc = 'abcdefghijklmnopqrs';
 
-const BATCH_SIZE = 128;
+const BATCH_SIZE = 4096;
 
 let SIZE   = 19;    
 let once   = true;
+let closed = false;
 
 let files   = null;
 let ixFile  = 0;
@@ -115,14 +116,20 @@ function exec() {
     if (once) {
         once = false;
         if (!loadFiles('./data')) {
-            ml.save('done.json');
-            return false;
+            return true;
         }
         ml.init();
         return true;
     }
     if (ml.ready()) {
-        if (!loadData(BATCH_SIZE, ml.send)) return false;
+        if (closed) {
+            return false;
+        }
+        if (!loadData(BATCH_SIZE, ml.send)) {
+            ml.save('done.json');
+            closed = true;
+            return true;
+        }
         ml.fit(BATCH_SIZE, SIZE);
         return true;
     }
