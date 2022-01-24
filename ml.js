@@ -1,6 +1,7 @@
 "use strict";
 
 const tf = require('@tensorflow/tfjs');
+const {nodeFileSystemRouter} = require('@tensorflow/tfjs-node/dist/io/file_system');
 
 const URL = 'https://games.dtco.ru/model/model.json';
 
@@ -9,11 +10,11 @@ const EPOCH_COUNT = 5;
 const VALID_SPLIT = 0.1;
 const FREEZE_CNT  = 0;
 
-let boards = null;
-let moves  = null;
-let count  = 0;
+let boards  = null;
+let moves   = null;
+let count   = 0;
 
-let model  = null;
+let model   = null;
 let isReady = false;
 
 async function init() {
@@ -76,43 +77,49 @@ function InitializeFromFen(fen, batch, size) {
     }
 }
 
-async function send(setup, move, size) {
+async function send(setup, move, size, batch) {
     console.log('[' + count + '] ' + setup + ': ' + move);
-    if (count >= BATCH_SIZE) {
-        const xshape = [BATCH_SIZE, 1, size, size];
-        const xs = tf.tensor4d(boards, xshape, 'float32');
-        const yshape = [BATCH_SIZE, size * size];
-        const ys =  tf.tensor2d(moves, yshape, 'float32');
-/*      const t0 = Date.now();
-        model.compile({optimizer: 'sgd', loss: 'categoricalCrossentropy', metrics: ['accuracy']});
-        const h = await model.fit(xs, ys, {
-            batchSize: BATCH_SIZE,
-            epochs: EPOCH_COUNT,
-            validationSplit: VALID_SPLIT
-        });    
-        console.log(h);
-        const t1 = Date.now();
-        console.log('Fit time: ' + (t1 - t0));*/
-        xs.dispose();
-        ys.dispose();
-        boards = null;
-        moves  = null;
-        count  = 0;
-        console.log('true');
-        return true;
-    }
     if (boards === null) {
-        boards = new Float32Array(BATCH_SIZE * size * size);
-        moves  = new Float32Array(BATCH_SIZE * size * size);   
+        boards = new Float32Array(batch * size * size);
+        moves  = new Float32Array(batch * size * size);   
         count  = 0;
     }
     InitializeFromFen(setup, count, size);
     moves[move + (count * size * size)] = 1;
     count++;
-    console.log('false');
     return false;
 }
 
-module.exports.init  = init;
-module.exports.ready = ready;
-module.exports.send  = send;
+async function fit(batch, size) {
+    isReady = false;
+    const xshape = [+batch, 1, +size, +size];
+    const xs = tf.tensor4d(boards, xshape, 'float32');
+    const yshape = [+batch, +size * +size];
+    const ys =  tf.tensor2d(moves, yshape, 'float32');
+    const t0 = Date.now();
+    model.compile({optimizer: 'sgd', loss: 'categoricalCrossentropy', metrics: ['accuracy']});
+    const h = await model.fit(xs, ys, {
+        batchSize: BATCH_SIZE,
+        epochs: EPOCH_COUNT,
+        validationSplit: VALID_SPLIT
+    });    
+    console.log(h);
+    const t1 = Date.now();
+    console.log('Fit time: ' + (t1 - t0));
+    xs.dispose();
+    ys.dispose();
+    isReady = true;
+    boards = null;
+    moves  = null;
+    count  = 0;
+}
+
+async function save(savePath) {
+    await model.save(`file:///tmp/${savePath}`);
+}
+
+module.exports.init    = init;
+module.exports.ready   = ready;
+module.exports.send    = send;
+module.exports.fit     = fit;
+module.exports.save    = save;

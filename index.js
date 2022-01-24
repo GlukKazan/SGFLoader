@@ -1,38 +1,46 @@
 "use strict";
 
-const sgf = require('./parser');
-const go = require('./go');
-const ml = require('./ml');
+const sgf  = require('./parser');
+const go   = require('./go');
+const ml   = require('./ml');
 
-const fs = require('fs');
+const fs   = require('fs');
 const path = require('path');
 const _ = require('underscore');
 
 const abc = 'abcdefghijklmnopqrs';
 
+const BATCH_SIZE = 128;
+
 let SIZE   = 19;    
 let once   = true;
-let boards = [];
-let ix     = 0;
+
+let files   = null;
+let ixFile  = 0;
+let boards  = [];
+let ixBoard = 0;
+
+function loadFiles(dir) {
+    files = fs.readdirSync(dir).map(fileName => {
+        return path.join(dir, fileName);
+    });
+    ixFile = 0;
+    return files.length > 0;
+}
 
 function move(s, SIZE) {
     return _.indexOf(abc, s[0]) + _.indexOf(abc, s[1]) * SIZE;
 }
 
-function loadFiles(dir) {
-    const files = fs.readdirSync(dir).map(fileName => {
-        return path.join(dir, fileName);
-    });
-    _.each(files, function(name) {
-        fs.readFile(name, (e, d) => {
-            if (e) {
-              console.error(e);
-              return;
-            }
+function loadData(bulk, callback) {
+    while (bulk > 0) {
+        if (ixBoard >= boards.length) {
+            if (ixFile >= files.length) return false;
+            boards = []; ixBoard = 0; 
+            const d = fs.readFileSync(files[ixFile]);
             const data = d.toString();
             const moves = sgf.parse(data);
             let WINNER = '';
-
             if (moves) {
                 let board = new Int32Array(SIZE * SIZE);
                 for (let i = 0; i < moves.length; i++) {
@@ -44,7 +52,6 @@ function loadFiles(dir) {
                     }
                     if (moves[i].name == 'RE') {
                         WINNER = moves[i].arg[0][0];
-//                      console.log('WINNER = ' + WINNER);
                         continue;
                     }
                     if (moves[i].name == 'AB') {
@@ -73,8 +80,6 @@ function loadFiles(dir) {
                                     setup: s,
                                     move: go.transform(m, rotate, SIZE)
                                 });
-//                              console.log(s);
-//                              if (ml.send(s, go.transform(m, rotate, SIZE), SIZE)) isDone = true;
                             });
                         }
                         board = go.RedoMove(board, 1, m, SIZE);
@@ -91,30 +96,34 @@ function loadFiles(dir) {
                                     setup: s,
                                     move: go.transform(m, rotate, SIZE)
                                 });
-//                              console.log(s);
-//                              if (ml.send(s, go.transform(m, rotate, SIZE), SIZE)) isDone = true;
                             });
                         }
                         board = go.RedoMove(board, -1, m, SIZE);
                     }
                 }
             }
-        })        
-    });
+            ixFile++;
+        }
+        callback(boards[ixBoard].setup, boards[ixBoard].move, SIZE, BATCH_SIZE);
+        ixBoard++;
+        bulk--;
+    }
+    return true;
 }
 
 function exec() {
     if (once) {
-        ml.init();
         once = false;
+        if (!loadFiles('./data')) {
+            ml.save('done');
+            return false;
+        }
+        ml.init();
         return true;
     }
     if (ml.ready()) {
-//      console.log('*** Ready *** ' + (boards.length - ix));
-        for (let i = 0; i < boards.length; i++) {
-            ml.send(boards[ix].setup, boards[ix].move, SIZE);
-            ix++;
-        }
+        if (!loadData(BATCH_SIZE, ml.send)) return false;
+        ml.fit(BATCH_SIZE, SIZE);
         return true;
     }
     return true;
@@ -126,5 +135,4 @@ let run = function() {
     }
 }
 
-loadFiles('./data');
 run();
