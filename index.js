@@ -115,7 +115,7 @@ function exec() {
     if (once) {
         once = false;
         if (!loadFiles('./data')) {
-            ml.save('done');
+            ml.save('done.json');
             return false;
         }
         ml.init();
