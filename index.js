@@ -8,6 +8,34 @@ const fs   = require('fs');
 const path = require('path');
 const _ = require('underscore');
 
+const winston = require('winston');
+require('winston-daily-rotate-file');
+
+const logFormat = winston.format.combine(
+    winston.format.timestamp({
+        format: 'HH:mm:ss'
+    }),
+    winston.format.printf(
+        info => `${info.level}: ${info.timestamp} - ${info.message}`
+    )
+);
+
+var transport = new winston.transports.DailyRotateFile({
+    dirname: '',
+    filename: 'sgfloader-%DATE%.log',
+    datePattern: 'YYYY-MM-DD',
+    zippedArchive: true,
+    maxSize: '20m',
+    maxFiles: '14d'
+});
+
+var logger = winston.createLogger({
+    format: logFormat,
+    transports: [
+      transport
+    ]
+});
+
 const abc = 'abcdefghijklmnopqrs';
 
 const BATCH_SIZE = 4096;
@@ -38,6 +66,8 @@ function loadData(bulk, callback) {
         if (ixBoard >= boards.length) {
             if (ixFile >= files.length) return false;
             boards = []; ixBoard = 0; 
+            console.log('Loaded: ' + files[ixFile]);
+            logger.info('Loaded: ' + files[ixFile]);
             const d = fs.readFileSync(files[ixFile]);
             const data = d.toString();
             const moves = sgf.parse(data);
@@ -105,9 +135,11 @@ function loadData(bulk, callback) {
             }
             ixFile++;
         }
-        callback(boards[ixBoard].setup, boards[ixBoard].move, SIZE, BATCH_SIZE);
+        if (boards[ixBoard]) {
+            callback(boards[ixBoard].setup, boards[ixBoard].move, SIZE, BATCH_SIZE);
+            bulk--;
+        }
         ixBoard++;
-        bulk--;
     }
     return true;
 }
@@ -118,7 +150,7 @@ function exec() {
         if (!loadFiles('./data')) {
             return true;
         }
-        ml.init();
+        ml.init(logger);
         return true;
     }
     if (ml.ready()) {
@@ -130,7 +162,7 @@ function exec() {
             closed = true;
             return true;
         }
-        ml.fit(BATCH_SIZE, SIZE);
+        ml.fit(BATCH_SIZE, SIZE, logger);
         return true;
     }
     return true;

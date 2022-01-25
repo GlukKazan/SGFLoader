@@ -1,14 +1,15 @@
 "use strict";
 
-const tf = require('@tensorflow/tfjs-node');
-const {nodeFileSystemRouter} = require('@tensorflow/tfjs-node/dist/io/file_system');
+const tf = require('@tensorflow/tfjs-node-gpu');
+//const wasm = require('@tensorflow/tfjs-backend-wasm');
+//const {nodeFileSystemRouter} = require('@tensorflow/tfjs-node/dist/io/file_system');
 
 const URL = 'https://games.dtco.ru/model/model.json';
 
 const BATCH_SIZE  = 128;
 const EPOCH_COUNT = 7;
 const VALID_SPLIT = 0.1;
-const FREEZE_CNT  = 0;
+const FREEZE_CNT  = 8;
 
 let boards  = null;
 let moves   = null;
@@ -17,19 +18,22 @@ let count   = 0;
 let model   = null;
 let isReady = false;
 
-async function init() {
+async function init(logger) {
     if (model === null) {
         const t0 = Date.now();
         tf.enableProdMode();
+//      await tf.setBackend('wasm');
         await tf.ready();
         model = await tf.loadLayersModel(URL);
         console.log(tf.getBackend());
+        logger.info(tf.getBackend());
         for (let i = 0; i < FREEZE_CNT; i++) {
             const l = model.getLayer(null, i);
             l.trainable = false;
         }
         const t1 = Date.now();
         console.log('Load time: ' + (t1 - t0));
+        logger.info('Load time: ' + (t1 - t0));
         isReady = true;
     }
 }
@@ -78,7 +82,7 @@ function InitializeFromFen(fen, batch, size) {
 }
 
 async function send(setup, move, size, batch) {
-    console.log('[' + count + '] ' + setup + ': ' + move);
+//  console.log('[' + count + '] ' + setup + ': ' + move);
     if (boards === null) {
         boards = new Float32Array(batch * size * size);
         moves  = new Float32Array(batch * size * size);   
@@ -90,7 +94,7 @@ async function send(setup, move, size, batch) {
     return false;
 }
 
-async function fit(batch, size) {
+async function fit(batch, size, logger) {
     isReady = false;
     const xshape = [+batch, 1, +size, +size];
     const xs = tf.tensor4d(boards, xshape, 'float32');
@@ -106,6 +110,7 @@ async function fit(batch, size) {
     console.log(h);
     const t1 = Date.now();
     console.log('Fit time: ' + (t1 - t0));
+    logger.info('Fit time: ' + (t1 - t0));
     xs.dispose();
     ys.dispose();
     isReady = true;
