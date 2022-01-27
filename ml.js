@@ -109,7 +109,7 @@ async function fit(batch, size, logger) {
     });    
     console.log(h);
     for (let i = 0; i < EPOCH_COUNT; i++) {
-        logger.info('acc = ' + h.history.acc[i] + ', loss = ' + h.history.loss[i] + ', val_acc = ' + h.history.val_acc[i] + ', val_loss = ' + h.history.val_loss[i]);
+        logger.info('epoch = ' + i + ', acc = ' + h.history.acc[i] + ', loss = ' + h.history.loss[i] + ', val_acc = ' + h.history.val_acc[i] + ', val_loss = ' + h.history.val_loss[i]);
     }
     const t1 = Date.now();
     console.log('Fit time: ' + (t1 - t0));
